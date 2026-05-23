@@ -1,0 +1,5 @@
+Name,Email,Department,Salary
+Alice Chen,alice@example.com,Engineering,92000
+Bob Martinez,bob@example.com,Design,78000
+Carol Kim,carol@example.com,Marketing,71000
+"O'Brien, Pat",pat@example.com,Sales,"65,000"

@@ -1,0 +1,46 @@
+---
+description: JLC Format conversion rules for csv_viewer (BOM & Pick and Place)
+alwaysApply: true
+---
+
+# JLC Format (csv_viewer)
+
+When changing export/conversion logic, use the column sets below. Pick & Place matches `JLC_Format_docs/PickandPlace_sample.xlsx`. BOM uses three columns only — **do not** include `JLCPCB Part #` (even though `BOM_sample.xlsx` has it).
+
+## Two output formats
+
+| Type | ID | Output headers (exact strings) | Download suffix |
+|------|-----|--------------------------------|-----------------|
+| BOM | `bom` | `Comment`, `Designator`, `Footprint` | `_JLC_BOM.csv` |
+| Pick & Place | `pnp` | `Designator`, `Mid X`, `Mid Y`, `Layer`, `Rotation` | `_JLC_PickPlace.csv` |
+
+BOM exports exactly three columns. Never add JLCPCB / LCSC part number columns.
+
+## Code layout
+
+- `js/jlc-format.js` — `JLC_FORMAT`, `autoMap`, `convert`, `validateMapping`, `rowsToCSV` (global `JLCFormat`)
+- `js/main.js` — toolbar select, `downloadJlcCsv()`, `getTabData()`
+- Do not duplicate format headers in `main.js`; extend `JLC_FORMAT` in `jlc-format.js`
+
+## Pick & Place transforms
+
+- **Mid X / Mid Y**: append `mm` if missing (e.g. `95.0518` → `95.0518mm`)
+- **Layer**: normalize to `Top` or `Bottom`
+- **Rotation**: numeric degrees only
+
+## Column mapping
+
+- Auto-map only (no mapping dialog). Add EDA aliases in `jlc-format.js` `aliases` arrays.
+- If required columns cannot be auto-mapped, show `alert()` with missing header names.
+
+## UI
+
+1. **New tab** button in tab bar (right of open tabs), not in header
+2. Header: font size + **JLC Format** dropdown + **Download CSV** only (no row/column sliders; resize via mouse on borders)
+3. **JLC Format** dropdown → opens dialog with **Download JLC CSV** only (no column mapping UI)
+4. Per-tab choice in `tab.jlcFormatId`; dialog closes on download or Close
+
+## CSV output
+
+- Comma-separated, `\r\n` line endings
+- Quote fields containing `,`, `"`, or newlines (`escapeCSVField`)
