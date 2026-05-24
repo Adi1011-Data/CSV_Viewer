@@ -14,6 +14,10 @@ A browser-based app to open CSV files, view them in an editable table, adjust la
 - **JLC Format** — choose **BOM** or **Pick & Place** in the toolbar; a dialog opens with **Download JLC CSV** (auto column mapping; see `JLC_Format_docs` samples)
 
 ## Quick start
+Use the web app directly here:  
+[Open Web App]  https://adi1011-data.github.io/CSV_Viewer/
+
+No download or installation is required.
 
 No build step required. Open `index.html` in a modern browser, or serve the folder locally:
 
