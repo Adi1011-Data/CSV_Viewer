@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="View and edit CSV files in a resizable table" />
+  <meta name="description" content="View and edit CSV and Excel files in a resizable table" />
   <title>CSV Viewer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -37,6 +37,15 @@
           <option value="pnp">Pick &amp; Place</option>
         </select>
       </label>
+      <button type="button" class="btn btn--secondary" id="findDuplicatesBtn" title="Find and remove duplicate rows or columns">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        Find duplicates
+      </button>
       <button type="button" class="btn btn--primary" id="downloadBtn">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -49,7 +58,7 @@
   </header>
 
   <main class="main">
-    <input type="file" id="fileInput" accept=".csv,text/csv" multiple hidden />
+    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" multiple hidden />
 
     <section class="dropzone" id="dropzone">
       <div class="dropzone__inner">
@@ -60,15 +69,15 @@
             <line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
         </div>
-        <h2 class="dropzone__title">Drop your CSV file here</h2>
-        <p class="dropzone__hint">or click to browse</p>
+        <h2 class="dropzone__title">Drop your CSV or Excel file here</h2>
+        <p class="dropzone__hint">or click to browse (.csv, .xlsx, .xls)</p>
         <p class="dropzone__meta">Multiple tabs · Edit cells · Resize with mouse · JLC BOM or Pick &amp; Place export</p>
       </div>
     </section>
 
     <section class="workspace" id="workspace" hidden>
-      <div class="tab-bar" id="tabBar" role="tablist" aria-label="Open CSV files">
-        <button type="button" class="tab-new" id="newTabBtn" aria-label="Open new tab" title="Open another CSV file">
+      <div class="tab-bar" id="tabBar" role="tablist" aria-label="Open spreadsheet files">
+        <button type="button" class="tab-new" id="newTabBtn" aria-label="Open new tab" title="Open another CSV or Excel file">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <line x1="12" y1="5" x2="12" y2="19"/>
             <line x1="5" y1="12" x2="19" y2="12"/>
@@ -79,6 +88,31 @@
       <div class="tab-panels" id="tabPanels"></div>
     </section>
   </main>
+
+  <dialog class="dup-dialog" id="dupDialog" aria-labelledby="dupDialogTitle">
+    <div class="dup-dialog__inner">
+      <h2 class="dup-dialog__title" id="dupDialogTitle">Find duplicates</h2>
+      <p class="dup-dialog__hint">Compares full row or column content (all cells). Highlights matches in the table; removal keeps the first occurrence.</p>
+      <fieldset class="dup-dialog__mode">
+        <legend class="dup-dialog__legend">Look for</legend>
+        <label class="dup-dialog__radio">
+          <input type="radio" name="dupMode" value="rows" checked />
+          Duplicate rows
+        </label>
+        <label class="dup-dialog__radio">
+          <input type="radio" name="dupMode" value="columns" />
+          Duplicate columns
+        </label>
+      </fieldset>
+      <p class="dup-dialog__summary" id="dupDialogSummary" hidden></p>
+      <div class="dup-dialog__actions">
+        <button type="button" class="btn btn--primary" id="dupDialogFind">Find</button>
+        <button type="button" class="btn btn--danger" id="dupDialogRemove" hidden disabled>Remove duplicates</button>
+        <button type="button" class="btn btn--secondary" id="dupDialogClear" hidden>Clear highlights</button>
+        <button type="button" class="btn btn--secondary" id="dupDialogClose">Close</button>
+      </div>
+    </div>
+  </dialog>
 
   <dialog class="jlc-dialog" id="jlcDialog" aria-labelledby="jlcDialogTitle">
     <div class="jlc-dialog__inner">
@@ -98,6 +132,7 @@
     </div>
   </dialog>
 
+  <script src="js/vendor/xlsx.full.min.js"></script>
   <script src="js/jlc-format.js"></script>
   <script src="js/main.js"></script>
 </body>

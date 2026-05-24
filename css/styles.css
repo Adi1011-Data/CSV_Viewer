@@ -171,6 +171,20 @@ body {
   background: var(--border);
 }
 
+.btn--danger {
+  background: #dc2626;
+  color: #fff;
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.btn--danger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* Main */
 .main {
   flex: 1;
@@ -459,6 +473,17 @@ body {
   background: var(--accent-soft);
 }
 
+.data-table th.is-dup-highlight,
+.data-table td.is-dup-highlight {
+  background: rgba(234, 179, 8, 0.22) !important;
+  box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.55);
+}
+
+.data-table tbody tr:hover td.is-dup-highlight,
+.data-table tbody tr:nth-child(even) td.is-dup-highlight {
+  background: rgba(234, 179, 8, 0.28) !important;
+}
+
 .data-table td[contenteditable="true"]:focus {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
@@ -598,6 +623,91 @@ body {
 }
 
 .jlc-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+/* Duplicates dialog */
+.dup-dialog {
+  margin: auto;
+  padding: 0;
+  max-width: min(440px, calc(100vw - 2rem));
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.dup-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.dup-dialog__inner {
+  padding: 1.25rem;
+}
+
+.dup-dialog__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.dup-dialog__hint {
+  margin: 0 0 1rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.dup-dialog__mode {
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.dup-dialog__legend {
+  padding: 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dup-dialog__radio {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.dup-dialog__radio input {
+  accent-color: var(--accent);
+}
+
+.dup-dialog__summary {
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  border-radius: 8px;
+}
+
+.dup-dialog__summary[hidden] {
+  display: none !important;
+}
+
+.dup-dialog__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;

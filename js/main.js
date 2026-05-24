@@ -16,8 +16,17 @@
   const jlcDialogSummary = document.getElementById("jlcDialogSummary");
   const jlcDialogDownload = document.getElementById("jlcDialogDownload");
   const jlcDialogClose = document.getElementById("jlcDialogClose");
+  const findDuplicatesBtn = document.getElementById("findDuplicatesBtn");
+  const dupDialog = document.getElementById("dupDialog");
+  const dupDialogSummary = document.getElementById("dupDialogSummary");
+  const dupDialogFind = document.getElementById("dupDialogFind");
+  const dupDialogRemove = document.getElementById("dupDialogRemove");
+  const dupDialogClear = document.getElementById("dupDialogClear");
+  const dupDialogClose = document.getElementById("dupDialogClose");
+  const dupModeInputs = dupDialog.querySelectorAll('input[name="dupMode"]');
 
   const EDGE = 10;
+  const DUP_SEP = "\x1E";
   const DEFAULTS = { fontSize: 14, rowHeight: 36, colWidth: 120 };
 
   const tabs = new Map();
@@ -103,14 +112,57 @@
     return s;
   }
 
+  function spreadsheetExtension(name) {
+    const lower = name.toLowerCase();
+    if (lower.endsWith(".xlsx")) return ".xlsx";
+    if (lower.endsWith(".xls")) return ".xls";
+    if (lower.endsWith(".csv")) return ".csv";
+    return ".csv";
+  }
+
   function uniqueFileName(name) {
-    const base = name.endsWith(".csv") ? name : name + ".csv";
+    const ext = spreadsheetExtension(name);
+    const base = /\.(csv|xlsx|xls)$/i.test(name) ? name : name + ext;
     const names = new Set([...tabs.values()].map((t) => t.fileName));
     if (!names.has(base)) return base;
-    const stem = base.replace(/\.csv$/i, "");
+    const stem = base.replace(/\.(csv|xlsx|xls)$/i, "");
     let n = 2;
-    while (names.has(`${stem} (${n}).csv`)) n++;
-    return `${stem} (${n}).csv`;
+    while (names.has(`${stem} (${n})${ext}`)) n++;
+    return `${stem} (${n})${ext}`;
+  }
+
+  function fileKind(file) {
+    const name = file.name.toLowerCase();
+    if (name.endsWith(".xlsx") || name.endsWith(".xls")) return "excel";
+    if (name.endsWith(".csv")) return "csv";
+    if (file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
+      return "excel";
+    }
+    if (file.type === "text/csv" || file.type === "application/vnd.ms-excel" || file.type === "") {
+      return "csv";
+    }
+    return null;
+  }
+
+  function parseExcel(arrayBuffer) {
+    if (typeof XLSX === "undefined") {
+      throw new Error("Excel reader failed to load.");
+    }
+
+    const workbook = XLSX.read(arrayBuffer, { type: "array" });
+    if (!workbook.SheetNames.length) return [[""]];
+
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+    const rows = raw.map((row) =>
+      (Array.isArray(row) ? row : []).map((cell) => String(cell ?? ""))
+    );
+
+    while (rows.length > 0 && rows[rows.length - 1].every((cell) => cell === "")) {
+      rows.pop();
+    }
+
+    return rows.length ? rows : [[""]];
   }
 
   function getActiveTab() {
@@ -275,6 +327,286 @@
     });
 
     tab.statsEl.textContent = `${dataRows.length} rows × ${colCount} columns`;
+    clearDuplicateHighlights(tab);
+    tab.dupState = null;
+  }
+
+  function updateTabStats(tab) {
+    const bodyRows = tab.tableBody.querySelectorAll("tr").length;
+    const cols = Math.max(0, (tab.tableHead.querySelector("tr")?.children.length || 1) - 1);
+    tab.statsEl.textContent = `${bodyRows} rows × ${cols} columns`;
+  }
+
+  function renumberBodyRows(tab) {
+    tab.tableBody.querySelectorAll("tr").forEach((tr, idx) => {
+      const rowNum = tr.querySelector(".row-index");
+      if (rowNum) rowNum.textContent = String(idx + 1);
+    });
+  }
+
+  function serializeDupKey(values) {
+    return values.join(DUP_SEP);
+  }
+
+  function clearDuplicateHighlights(tab) {
+    if (!tab) return;
+    tab.dataTable.querySelectorAll(".is-dup-highlight").forEach((el) => {
+      el.classList.remove("is-dup-highlight");
+    });
+  }
+
+  function findDuplicateRows(tab) {
+    const byKey = new Map();
+
+    tab.tableBody.querySelectorAll("tr").forEach((tr, rowIdx) => {
+      const values = [];
+      tr.querySelectorAll("td").forEach((td, idx) => {
+        if (idx === 0) return;
+        values.push(td.textContent.trim());
+      });
+      const key = serializeDupKey(values);
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(rowIdx);
+    });
+
+    const highlightRowIndices = [];
+    const removeRowIndices = [];
+    let groupCount = 0;
+    let extraCount = 0;
+
+    byKey.forEach((indices) => {
+      if (indices.length < 2) return;
+      groupCount++;
+      extraCount += indices.length - 1;
+      indices.forEach((i) => highlightRowIndices.push(i));
+      indices.slice(1).forEach((i) => removeRowIndices.push(i));
+    });
+
+    return {
+      mode: "rows",
+      groupCount,
+      extraCount,
+      highlightRowIndices,
+      removeRowIndices,
+    };
+  }
+
+  function findDuplicateColumns(tab) {
+    const headerTr = tab.tableHead.querySelector("tr");
+    if (!headerTr) {
+      return {
+        mode: "columns",
+        groupCount: 0,
+        extraCount: 0,
+        highlightColIndices: [],
+        removeColIndices: [],
+      };
+    }
+
+    const ths = headerTr.querySelectorAll("th");
+    const colCount = ths.length - 1;
+    const byKey = new Map();
+
+    for (let c = 0; c < colCount; c++) {
+      const colDomIndex = c + 1;
+      const values = [ths[colDomIndex].textContent.trim()];
+      tab.tableBody.querySelectorAll("tr").forEach((tr) => {
+        const td = tr.querySelectorAll("td")[colDomIndex];
+        values.push(td ? td.textContent.trim() : "");
+      });
+      const key = serializeDupKey(values);
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(c);
+    }
+
+    const highlightColIndices = [];
+    const removeColIndices = [];
+    let groupCount = 0;
+    let extraCount = 0;
+
+    byKey.forEach((indices) => {
+      if (indices.length < 2) return;
+      groupCount++;
+      extraCount += indices.length - 1;
+      indices.forEach((i) => highlightColIndices.push(i));
+      indices.slice(1).forEach((i) => removeColIndices.push(i));
+    });
+
+    return {
+      mode: "columns",
+      groupCount,
+      extraCount,
+      highlightColIndices,
+      removeColIndices,
+    };
+  }
+
+  function applyDuplicateHighlights(tab, state) {
+    clearDuplicateHighlights(tab);
+    if (!state || state.extraCount === 0) return;
+
+    if (state.mode === "rows") {
+      const bodyRows = tab.tableBody.querySelectorAll("tr");
+      state.highlightRowIndices.forEach((rowIdx) => {
+        const tr = bodyRows[rowIdx];
+        if (!tr) return;
+        tr.querySelectorAll("td").forEach((td, idx) => {
+          if (idx === 0) return;
+          td.classList.add("is-dup-highlight");
+        });
+      });
+      return;
+    }
+
+    state.highlightColIndices.forEach((colIdx) => {
+      const nth = colIdx + 2;
+      tab.dataTable
+        .querySelectorAll(`thead th:nth-child(${nth}), tbody td:nth-child(${nth})`)
+        .forEach((el) => {
+          el.classList.add("is-dup-highlight");
+        });
+    });
+  }
+
+  function formatDupSummary(state) {
+    if (!state || state.extraCount === 0) {
+      return "No duplicates found. Every " + (state?.mode === "columns" ? "column" : "row") + " is unique.";
+    }
+
+    const unit = state.mode === "columns" ? "column" : "row";
+    const units = state.mode === "columns" ? "columns" : "rows";
+    const highlighted =
+      state.mode === "columns"
+        ? state.highlightColIndices.length
+        : state.highlightRowIndices.length;
+
+    return (
+      `Found ${state.extraCount} extra duplicate ${state.extraCount === 1 ? unit : units} ` +
+      `in ${state.groupCount} ${state.groupCount === 1 ? "group" : "groups"} ` +
+      `(${highlighted} matching ${units} highlighted in yellow). ` +
+      `Remove duplicates keeps the first ${unit} in each group.`
+    );
+  }
+
+  function setDupDialogResult(state) {
+    const tab = getActiveTab();
+    if (tab) {
+      tab.dupState = state;
+      applyDuplicateHighlights(tab, state);
+    }
+
+    const hasDup = state && state.extraCount > 0;
+    dupDialogSummary.hidden = false;
+    dupDialogSummary.textContent = formatDupSummary(state);
+    dupDialogRemove.hidden = !hasDup;
+    dupDialogRemove.disabled = !hasDup;
+    dupDialogClear.hidden = !hasDup;
+  }
+
+  function resetDupDialogUi() {
+    dupDialogSummary.hidden = true;
+    dupDialogSummary.textContent = "";
+    dupDialogRemove.hidden = true;
+    dupDialogRemove.disabled = true;
+    dupDialogClear.hidden = true;
+    const tab = getActiveTab();
+    if (tab) {
+      clearDuplicateHighlights(tab);
+      tab.dupState = null;
+    }
+  }
+
+  function getDupMode() {
+    const checked = dupDialog.querySelector('input[name="dupMode"]:checked');
+    return checked ? checked.value : "rows";
+  }
+
+  function runFindDuplicates() {
+    const tab = getActiveTab();
+    if (!tab) return;
+
+    const mode = getDupMode();
+    const state = mode === "columns" ? findDuplicateColumns(tab) : findDuplicateRows(tab);
+    setDupDialogResult(state);
+  }
+
+  function removeDuplicateRow(tab, bodyRowIndex) {
+    const tr = tab.tableBody.querySelectorAll("tr")[bodyRowIndex];
+    if (tr) tr.remove();
+  }
+
+  function removeDuplicateColumn(tab, dataColIndex) {
+    const domIndex = dataColIndex + 1;
+    const cols = tab.colGroup.querySelectorAll("col");
+    if (cols[domIndex]) cols[domIndex].remove();
+
+    const headerTr = tab.tableHead.querySelector("tr");
+    const th = headerTr?.querySelectorAll("th")[domIndex];
+    if (th) th.remove();
+
+    tab.tableBody.querySelectorAll("tr").forEach((tr) => {
+      const td = tr.querySelectorAll("td")[domIndex];
+      if (td) td.remove();
+    });
+
+    if (tab.colWidths[domIndex] !== undefined) {
+      tab.colWidths.splice(domIndex, 1);
+    }
+  }
+
+  function removeDuplicates() {
+    const tab = getActiveTab();
+    const state = tab?.dupState;
+    if (!tab || !state || state.extraCount === 0) return;
+
+    const label = state.mode === "columns" ? "column" : "row";
+    const count = state.extraCount;
+    const ok = confirm(
+      `Remove ${count} duplicate ${count === 1 ? label : label + "s"}? The first copy in each group will be kept.`
+    );
+    if (!ok) return;
+
+    if (state.mode === "rows") {
+      [...state.removeRowIndices]
+        .sort((a, b) => b - a)
+        .forEach((idx) => removeDuplicateRow(tab, idx));
+      renumberBodyRows(tab);
+    } else {
+      [...state.removeColIndices]
+        .sort((a, b) => b - a)
+        .forEach((idx) => removeDuplicateColumn(tab, idx));
+    }
+
+    updateTabStats(tab);
+    clearDuplicateHighlights(tab);
+    tab.dupState = null;
+    resetDupDialogUi();
+
+    const mode = getDupMode();
+    const next = mode === "columns" ? findDuplicateColumns(tab) : findDuplicateRows(tab);
+    if (next.extraCount > 0) {
+      setDupDialogResult(next);
+    } else {
+      dupDialogSummary.hidden = false;
+      dupDialogSummary.textContent = "Duplicates removed. No more duplicate " + (mode === "columns" ? "columns" : "rows") + " found.";
+    }
+  }
+
+  function closeDupDialog() {
+    if (dupDialog.open) dupDialog.close();
+  }
+
+  function openDupDialog() {
+    const tab = getActiveTab();
+    if (!tab) return;
+
+    if (tab.dupState) {
+      setDupDialogResult(tab.dupState);
+    } else {
+      resetDupDialogUi();
+    }
+
+    if (!dupDialog.open) dupDialog.showModal();
   }
 
   function getCell(target) {
@@ -548,6 +880,7 @@
     const prev = getActiveTab();
     if (prev) saveTabSettings(prev);
     closeJlcDialog();
+    closeDupDialog();
 
     activeTabId = id;
     tabs.forEach((tab) => {
@@ -613,6 +946,8 @@
     tabs.clear();
     endResize();
     closeJlcDialog();
+    closeDupDialog();
+    resetDupDialogUi();
 
     dropzone.hidden = false;
     workspace.hidden = true;
@@ -688,27 +1023,24 @@
 
   function loadFile(file) {
     if (!file) return;
-    const isCsv =
-      file.name.toLowerCase().endsWith(".csv") ||
-      file.type === "text/csv" ||
-      file.type === "application/vnd.ms-excel" ||
-      file.type === "";
-    if (!isCsv) {
-      alert(`"${file.name}" is not a CSV file.`);
+    const kind = fileKind(file);
+    if (!kind) {
+      alert(`"${file.name}" is not a supported file. Use .csv, .xlsx, or .xls.`);
       return;
     }
 
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const rows = parseCSV(reader.result);
+        const rows = kind === "excel" ? parseExcel(reader.result) : parseCSV(reader.result);
         addTab(file.name, rows);
       } catch (err) {
         alert(`Could not parse "${file.name}": ${err.message}`);
       }
     };
     reader.onerror = () => alert(`Failed to read "${file.name}".`);
-    reader.readAsText(file);
+    if (kind === "excel") reader.readAsArrayBuffer(file);
+    else reader.readAsText(file);
   }
 
   function loadFiles(fileList) {
@@ -787,6 +1119,22 @@
 
   jlcDialog.addEventListener("click", (e) => {
     if (e.target === jlcDialog) closeJlcDialog();
+  });
+
+  findDuplicatesBtn.addEventListener("click", openDupDialog);
+  dupDialogFind.addEventListener("click", runFindDuplicates);
+  dupDialogRemove.addEventListener("click", removeDuplicates);
+  dupDialogClear.addEventListener("click", resetDupDialogUi);
+  dupDialogClose.addEventListener("click", closeDupDialog);
+
+  dupDialog.addEventListener("click", (e) => {
+    if (e.target === dupDialog) closeDupDialog();
+  });
+
+  dupModeInputs.forEach((input) => {
+    input.addEventListener("change", () => {
+      resetDupDialogUi();
+    });
   });
 
   downloadBtn.addEventListener("click", () => {
