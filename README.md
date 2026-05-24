@@ -1,11 +1,11 @@
-# CSV Viewer
+# File Viewer
 
 A browser-based app to open CSV files, view them in an editable table, adjust layout, and download your changes.
 
 ## Features
 
-- **Drag & drop** or click to open `.csv` files (multiple files open in separate tabs)
-- **Tabs** — each CSV opens in its own tab; switch between files without leaving the page
+- **Drag & drop** or click to open `.csv, .xlsx, .xls` files (multiple files open in separate tabs)
+- **Tabs** — each file opens in its own tab; switch between files without leaving the page
 - **Table view** with row numbers and editable cells (click to edit)
 - **Resize columns** by dragging the right border of any cell (like a spreadsheet)
 - **Resize rows** by dragging the bottom border of any cell
@@ -15,7 +15,7 @@ A browser-based app to open CSV files, view them in an editable table, adjust la
 
 ## Quick start
 Use the web app directly here:  
-[Open Web App]  https://adi1011-data.github.io/CSV_Viewer/
+[Open Web App](https://adi1011-data.github.io/FileViewer/)
 
 No download or installation is required.
 
@@ -34,7 +34,7 @@ Then visit `http://localhost:8080`.
 
 ## Usage
 
-1. Drop a CSV file onto the upload area (or click to browse).
+1. Drop a file onto the upload area (or click to browse).
 2. Edit cell values directly in the table.
 3. Use the font size slider in the header if needed.
 4. Drag a column’s right border or a row’s bottom border to resize.
@@ -46,7 +46,7 @@ Then visit `http://localhost:8080`.
 ## Project structure
 
 ```
-csv_viewer/
+FileViewer/
 ├── index.html
 ├── css/styles.css
 ├── js/main.js
